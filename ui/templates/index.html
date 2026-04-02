@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Story Analyst – Test Case Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+    <header class="header">
+        <div class="header-inner">
+            <div style="position: absolute; right: 0; top: 0;">
+                <a href="/logout" style="color: var(--accent); text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; border: 1px solid var(--accent); border-radius: 8px;">Logout</a>
+            </div>
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">StoryAnalyst <span class="logo-sub">AI</span></span>
+            </div>
+            <p class="header-tagline">User Stories · Website Explorer · Combined Test Generator — Powered by Gemini AI
+            </p>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- Mode Tabs -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tab-story" onclick="switchMode('story')">📝 User Story</button>
+            <button class="mode-tab" id="tab-url" onclick="switchMode('url')">🌐 Website Explorer</button>
+            <button class="mode-tab" id="tab-combo" onclick="switchMode('combo')">🔗 Combined Generator</button>
+            <button class="mode-tab" id="tab-exec" onclick="switchMode('exec')">🎬 Test Executor</button>
+            <button class="mode-tab" id="tab-report" onclick="switchMode('report')">📄 Report</button>
+        </div>
+
+
+        <!-- ── USER STORY PANEL ── -->
+        <div class="panels-wrapper">
+        <section class="card input-card" id="panel-story">
+            <h2 class="card-title">📝 Enter Your User Story</h2>
+            <p class="card-subtitle">Paste any user story. AI agents extract conditions and generate all test cases.</p>
+            <div class="example-chips">
+                <span class="chip-label">Quick examples:</span>
+                <button class="chip"
+                    data-story="As a user, I want to log in with my email and password so that I can access my account.">Login</button>
+                <button class="chip"
+                    data-story="As a new user, I want to register an account with my name, email, and password so that I can use the platform.">Registration</button>
+                <button class="chip"
+                    data-story="As a job seeker, I want to apply for a job by submitting my resume and cover letter so that I can be considered for the position.">Job
+                    Application</button>
+                <button class="chip"
+                    data-story="As a recruiter, I want to post a job listing with title, description, location, and salary so that candidates can apply.">Job
+                    Posting</button>
+                <button class="chip"
+                    data-story="As a user, I want to search for jobs by keyword and location so that I can find relevant opportunities.">Search</button>
+                <button class="chip"
+                    data-story="As a user, I want to reset my forgotten password via email so that I can regain access.">Password
+                    Reset</button>
+            </div>
+            <textarea id="story-input" class="story-textarea"
+                placeholder="e.g. As a user, I want to log in with my email and password so that I can access my account."
+                rows="5"></textarea>
+            <div class="input-actions">
+                <button id="analyze-btn" class="btn btn-primary" onclick="analyze()"><span>🚀</span> Analyze &amp;
+                    Generate Test Cases</button>
+                <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+        </section>
+
+        <!-- ── WEBSITE EXPLORER PANEL ── -->
+        <section class="card input-card hidden" id="panel-url">
+            <h2 class="card-title">🌐 Website Explorer</h2>
+            <p class="card-subtitle">Enter a URL — the agent crawls it and extracts all pages, forms, fields, buttons,
+                and links.</p>
+            <div class="url-row">
+                <input id="url-input" class="url-input" type="url" placeholder="https://example.com/login" />
+                <div class="depth-group">
+                    <label class="depth-label" for="depth-select">Crawl Depth</label>
+                    <select id="depth-select" class="depth-select">
+                        <option value="0">0 — Start page only</option>
+                        <option value="1" selected>1 — Start + direct links</option>
+                        <option value="2">2 — 2 levels deep</option>
+                    </select>
+                </div>
+            </div>
+            <div class="example-chips" style="margin-top:.8rem">
+                <span class="chip-label">Try:</span>
+                <button class="chip" data-url="https://books.toscrape.com">Books Store</button>
+                <button class="chip" data-url="https://quotes.toscrape.com">Quotes Site</button>
+                <button class="chip" data-url="https://httpbin.org/forms/post">Sample Form</button>
+            </div>
+            <div class="input-actions" style="margin-top:1.2rem">
+                <button id="explore-btn" class="btn btn-primary btn-teal" onclick="exploreUrl()"><span>🔍</span> Explore
+                    Website</button>
+                <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+        </section>
+
+        <!-- ── COMBINED GENERATOR PANEL ── -->
+        <section class="card input-card hidden" id="panel-combo">
+            <h2 class="card-title">🔗 Combined Test Case Generator</h2>
+            <p class="card-subtitle">Provide a user story <em>and</em> a website URL. The system will crawl the site,
+                match conditions to real UI elements, and generate test cases with both <strong>manual steps</strong>
+                and <strong>automation steps</strong>.</p>
+
+            <div class="combo-grid">
+                <div>
+                    <label class="depth-label" style="display:block;margin-bottom:.5rem">User Story</label>
+                    <textarea id="combo-story" class="story-textarea" rows="4"
+                        placeholder="As a user, I want to log in with my email and password…"></textarea>
+                </div>
+                <div>
+                    <label class="depth-label" style="display:block;margin-bottom:.5rem">Website URL</label>
+                    <input id="combo-url" class="url-input" type="url" placeholder="https://example.com/login"
+                        style="width:100%" />
+                    <div class="depth-group" style="margin-top:.75rem">
+                        <label class="depth-label" for="combo-depth">Crawl Depth</label>
+                        <select id="combo-depth" class="depth-select">
+                            <option value="0">0 — Start page only</option>
+                            <option value="1" selected>1 — Start + direct links</option>
+                            <option value="2">2 — 2 levels deep</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-chips" style="margin-top:.8rem">
+                <span class="chip-label">Example combos:</span>
+                <button class="chip"
+                    data-combo-story="As a user, I want to log in with my email and password so that I can access my account."
+                    data-combo-url="https://quotes.toscrape.com/login">Login Combo</button>
+                <button class="chip"
+                    data-combo-story="As a new user, I want to register an account with my name, email, and password."
+                    data-combo-url="https://quotes.toscrape.com/register">Register Combo</button>
+            </div>
+
+            <div class="input-actions" style="margin-top:1.2rem">
+                <button id="combo-btn" class="btn btn-primary btn-purple" onclick="generateCombined()"><span>⚡</span>
+                    Generate Combined Test Cases</button>
+                <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+            </div>
+        </section>
+
+        <!-- ── TEST EXECUTOR PANEL ── -->
+        <section class="card input-card hidden" id="panel-exec">
+            <h2 class="card-title">🎬 Test Executor</h2>
+            <p class="card-subtitle">Runs the combined test cases in a real Chrome browser via Selenium and collects
+                pass/fail results, execution times, and failure screenshots.</p>
+
+            <div class="exec-options">
+                <label class="exec-toggle">
+                    <input type="checkbox" id="headless-toggle" checked />
+                    <span class="toggle-label">Headless mode <span class="toggle-hint">(uncheck to see the browser
+                            window)</span></span>
+                </label>
+            </div>
+
+            <div class="exec-hint" id="exec-hint">
+                ⚠️ First generate combined test cases in the <strong>🔗 Combined Generator</strong> tab, then come back
+                here to run them.
+            </div>
+
+            <div class="input-actions" style="margin-top:1.2rem">
+                <button id="run-btn" class="btn btn-primary btn-green" onclick="runTests()" disabled>
+                    <span>▶</span> Run Tests
+                </button>
+                <span id="exec-count-hint" class="exec-count-hint"></span>
+            </div>
+        </section>
+
+        <!-- ── REPORT PANEL ── -->
+        <section class="card input-card hidden" id="panel-report">
+            <h2 class="card-title">📄 Test Report Generator</h2>
+            <p class="card-subtitle">Generate a professional HTML test report from your latest execution results. The
+                report includes a summary, feature-grouped results, failure screenshots, and recommendations.</p>
+
+            <div class="exec-hint" id="report-hint">
+                ⚠️ First run test cases in the <strong>🎬 Test Executor</strong> tab, then come back here to generate
+                the report.
+            </div>
+
+            <div class="input-actions" style="margin-top:1.2rem">
+                <button id="gen-report-btn" class="btn btn-primary btn-purple" onclick="generateReport()" disabled>
+                    <span>📊</span> Generate Report
+                </button>
+                <button id="dl-report-btn" class="btn btn-secondary hidden" onclick="downloadReport()">
+                    ⬇️ Download .html
+                </button>
+            </div>
+
+            <!-- Inline report preview -->
+            <div id="report-preview-wrap" class="hidden" style="margin-top:1.5rem">
+                <iframe id="report-iframe"
+                    style="width:100%;height:700px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;background:#0d0f1a"></iframe>
+            </div>
+        </section>
+
+
+        <section id="execution-results" class="hidden">
+            <div class="card">
+                <div class="explorer-header">
+                    <h2 class="card-title">📊 Execution Results</h2>
+                    <div id="exec-meta" class="explorer-meta"></div>
+                    <button class="btn btn-secondary" onclick="exportExecJSON()" style="margin-left:auto">⬇️ Export
+                        JSON</button>
+                </div>
+
+                <!-- Progress bar (shown while running) -->
+                <div id="exec-progress-wrap" class="hidden">
+                    <div class="progress-bar-bg">
+                        <div id="exec-progress-bar" class="progress-bar-fill"></div>
+                    </div>
+                    <p id="exec-progress-label" class="progress-label">Running…</p>
+                </div>
+
+                <!-- Stats chips -->
+                <div class="stats-row" id="exec-stats" style="margin-bottom:1.5rem"></div>
+
+                <!-- Results table -->
+                <div class="exec-table-wrap">
+                    <table class="exec-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Condition</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Log / Error</th>
+                                <th>Screenshot</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exec-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loader -->
+        <div id="loader" class="loader hidden">
+            <div class="spinner"></div>
+            <p id="loader-text">Processing…</p>
+        </div>
+
+        <!-- Error -->
+        <div id="error-banner" class="error-banner hidden"></div>
+
+        <!-- ── STORY RESULTS ── -->
+        <section id="results" class="hidden">
+            <div class="card analysis-card">
+                <h2 class="card-title">🔍 Story Analysis</h2>
+                <div class="analysis-grid">
+                    <div class="analysis-item"><span class="analysis-label">Feature</span><span id="res-feature"
+                            class="analysis-value feature-badge"></span></div>
+                    <div class="analysis-item"><span class="analysis-label">User Role</span><span id="res-role"
+                            class="analysis-value role-badge"></span></div>
+                    <div class="analysis-item"><span class="analysis-label">Conditions Found</span><span id="res-count"
+                            class="analysis-value count-badge"></span></div>
+                </div>
+                <h3 class="conditions-heading">Extracted Conditions</h3>
+                <ul id="conditions-list" class="conditions-list"></ul>
+            </div>
+            <div class="card suite-summary-card">
+                <h2 class="card-title">📊 Test Suite Summary</h2>
+                <div class="stats-row" id="stats-row"></div>
+            </div>
+            <div class="card test-cases-card">
+                <div class="tc-header">
+                    <h2 class="card-title">🧪 Generated Test Cases</h2>
+                    <div class="filter-pills">
+                        <button class="pill active" data-filter="all" onclick="filterCases('all', this)">All</button>
+                        <button class="pill positive" data-filter="Positive" onclick="filterCases('Positive', this)">✅
+                            Positive</button>
+                        <button class="pill negative" data-filter="Negative" onclick="filterCases('Negative', this)">❌
+                            Negative</button>
+                        <button class="pill boundary" data-filter="Boundary" onclick="filterCases('Boundary', this)">📏
+                            Boundary</button>
+                        <button class="pill edge" data-filter="Edge Case" onclick="filterCases('Edge Case', this)">⚠️
+                            Edge</button>
+                    </div>
+                </div>
+                <div id="test-cases-container"></div>
+            </div>
+            <div class="export-row">
+                <button class="btn btn-secondary" onclick="exportJSON()">⬇️ Export JSON</button>
+                <button class="btn btn-secondary" onclick="exportCSV()">📄 Export CSV</button>
+            </div>
+        </section>
+
+        <!-- ── WEBSITE EXPLORER RESULTS ── -->
+        <section id="explorer-results" class="hidden">
+            <div class="card">
+                <div class="explorer-header">
+                    <h2 class="card-title">🗺️ Website Structure</h2>
+                    <div class="explorer-meta" id="explorer-meta"></div>
+                    <button class="btn btn-secondary" onclick="exportExplorerJSON()">⬇️ Export JSON</button>
+                </div>
+                <div id="explorer-pages"></div>
+            </div>
+        </section>
+
+        <!-- ── COMBINED RESULTS ── -->
+        <section id="combined-results" class="hidden">
+            <div class="card">
+                <div class="explorer-header">
+                    <h2 class="card-title">⚡ Combined Test Cases</h2>
+                    <div id="combined-meta" class="explorer-meta"></div>
+                    <div style="display:flex;gap:.6rem">
+                        <button class="btn btn-secondary" onclick="exportCombinedJSON()">⬇️ Export JSON</button>
+                        <button class="btn btn-secondary" onclick="exportCombinedCSV()">📄 Export CSV</button>
+                    </div>
+                </div>
+                <div class="filter-pills" id="combo-pills" style="margin-bottom:1.25rem">
+                    <button class="pill active" data-filter="all" onclick="filterCombined('all',this)">All</button>
+                    <button class="pill positive" data-filter="Positive" onclick="filterCombined('Positive',this)">✅
+                        Positive</button>
+                    <button class="pill negative" data-filter="Negative" onclick="filterCombined('Negative',this)">❌
+                        Negative</button>
+                    <button class="pill boundary" data-filter="Boundary" onclick="filterCombined('Boundary',this)">📏
+                        Boundary</button>
+                    <button class="pill edge" data-filter="Edge Case" onclick="filterCombined('Edge Case',this)">⚠️
+                        Edge</button>
+                    <button class="pill" data-filter="unmapped" onclick="filterCombined('unmapped',this)"
+                        style="border-color:rgba(251,191,36,.4);color:#fbbf24">⚠️ Unmapped</button>
+                </div>
+                <div id="combined-container"></div>
+            </div>
+        </section>
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        <p>Story Analyst AI · Multi-Agent Test Case Generator · Powered by Google Gemini</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login & Signup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+  <div class="bg-white shadow-xl rounded-2xl w-full max-w-md p-8">
+    <h2 id="formTitle" class="text-2xl font-bold text-center mb-6">Login</h2>
+
+    <!-- Login Form -->
+    <form id="loginForm" class="space-y-4">
+      <input id="loginEmail" type="email" placeholder="Email"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" required />
+
+      <input id="loginPassword" type="password" placeholder="Password"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" required />
+
+      <button type="submit"
+        class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition">
+        Login
+      </button>
+    </form>
+
+    <!-- Signup Form -->
+    <form id="signupForm" class="space-y-4 hidden">
+      <input id="signupName" type="text" placeholder="Full Name"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" required />
+
+      <input id="signupEmail" type="email" placeholder="Email"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" required />
+
+      <input id="signupPassword" type="password" placeholder="Password"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" required />
+
+      <input id="signupConfirmPassword" type="password" placeholder="Confirm Password"
+        class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" required />
+
+      <button type="submit"
+        class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition">
+        Sign Up
+      </button>
+    </form>
+
+    <p class="text-center text-sm mt-4">
+      <span id="toggleText">Don't have an account?</span>
+      <button id="toggleBtn" class="text-blue-500 font-semibold ml-1">Sign Up</button>
+    </p>
+
+    <p id="message" class="text-center text-sm mt-4 text-red-500"></p>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const toggleText = document.getElementById('toggleText');
+    const formTitle = document.getElementById('formTitle');
+    const message = document.getElementById('message');
+
+    toggleBtn.addEventListener('click', () => {
+      loginForm.classList.toggle('hidden');
+      signupForm.classList.toggle('hidden');
+
+      if (loginForm.classList.contains('hidden')) {
+        formTitle.innerText = 'Sign Up';
+        toggleText.innerText = 'Already have an account?';
+        toggleBtn.innerText = 'Login';
+      } else {
+        formTitle.innerText = 'Login';
+        toggleText.innerText = "Don't have an account?";
+        toggleBtn.innerText = 'Sign Up';
+      }
+      message.innerText = '';
+    });
+
+    // Fake local storage user DB
+    let users = JSON.parse(localStorage.getItem('users') || '[]');
+
+    signupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('signupName').value;
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupConfirmPassword').value;
+
+      if (password !== confirmPassword) {
+        message.innerText = 'Passwords do not match';
+        return;
+      }
+
+      if (users.find(u => u.email === email)) {
+        message.innerText = 'Email already exists';
+        return;
+      }
+
+      users.push({ name, email, password });
+      localStorage.setItem('users', JSON.stringify(users));
+
+      message.style.color = 'green';
+      message.innerText = 'Registration successful! Please login.';
+
+      signupForm.reset();
+    });
+
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      const user = users.find(u => u.email === email && u.password === password);
+
+      if (!user) {
+        message.style.color = 'red';
+        message.innerText = 'Invalid email or password';
+        return;
+      }
+
+      message.style.color = 'green';
+      message.innerText = 'Login successful!';
+
+      localStorage.setItem('loggedInUser', JSON.stringify(user));
+
+      // Simulate redirect
+      setTimeout(() => {
+        alert('Redirecting to dashboard...');
+      }, 1000);
+    });
+  </script>
+
+</body>
+</html>
