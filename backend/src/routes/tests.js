@@ -79,17 +79,44 @@ router.post("/start", verifyToken, async (req, res) => {
   const jobId = generateJobId();
   jobs.set(jobId, { status: "running", progress: 0, total: test_cases.length, results: [] });
 
-  // Simulate async execution
+  // Real async proxy to Python
   (async () => {
-    const results = [];
-    for (let i = 0; i < test_cases.length; i++) {
-      await new Promise((r) => setTimeout(r, 600 + Math.random() * 400));
-      results.push(mockExecuteTestCase(test_cases[i]));
+    try {
+      // Add fake midway progress for UX loading states
+      jobs.set(jobId, { status: "running", progress: Math.max(1, Math.floor(test_cases.length / 2)), total: test_cases.length, results: [] });
+      
+      const { data } = await axios.post(
+        `${PYTHON_AI_URL}/execute`,
+        { test_cases, headless: true },
+        { headers: { "X-Internal-Secret": INTERNAL_SECRET }, timeout: 180000 }
+      );
+      
+      // Mutate screenshot paths to pipe through node.js proxy instead of direct 10000 port
+      const results = (data.results || []).map(r => {
+        if (r.screenshot && r.screenshot.startsWith("/screenshots/")) {
+          // Node route will be /api/tests/screenshots/file.png
+          r.screenshot = `/api/tests${r.screenshot}`; 
+        }
+        return r;
+      });
+
       jobs.set(jobId, {
-        status: i === test_cases.length - 1 ? "done" : "running",
-        progress: i + 1,
+        status: "done",
+        progress: test_cases.length,
         total: test_cases.length,
         results,
+        summary: data.summary || { total: results.length, passed: results.filter(r=>r.status==="Pass").length, failed: results.filter(r=>r.status==="Fail").length, errored: 0 }
+      });
+    } catch (err) {
+      console.warn("⚠️ Python executor failed, falling back to mock:", err.message);
+      const results = test_cases.map(mockExecuteTestCase);
+      jobs.set(jobId, {
+        status: "done",
+        progress: test_cases.length,
+        total: test_cases.length,
+        results,
+        summary: { total: results.length, passed: results.filter((r) => r.status === "Pass").length, failed: results.filter((r) => r.status === "Fail").length, errored: 0 },
+        mockNote: "Python executor failed, showing mock data."
       });
     }
   })();
@@ -107,8 +134,25 @@ router.get("/status/:jobId", verifyToken, (req, res) => {
 
   res.json({
     ...job,
-    summary: { total: job.total, passed, failed, errored: 0 },
+    summary: job.summary || { total: job.total, passed, failed, errored: 0 },
   });
+});
+
+// ─── GET /api/tests/screenshots/:filename ────────────────────────────────────
+router.get("/screenshots/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const response = await axios({
+      method: "get",
+      url: `${PYTHON_AI_URL}/screenshots/${filename}`,
+      responseType: "stream",
+      timeout: 10000,
+    });
+    response.data.pipe(res);
+  } catch (err) {
+    console.error("[tests/screenshot] Image fetch failed:", err.message);
+    res.status(404).json({ error: "Screenshot not found on Python backend." });
+  }
 });
 
 module.exports = router;

@@ -57,7 +57,7 @@ export default function CombinedTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [output, setOutput] = useState(null);
-  const { addToast, setUsageCount } = useStore();
+  const { addToast, setUsageCount, setCombinedOutput } = useStore();
 
   async function handleGenerate() {
     if (!requirement.trim() || !url.trim()) { addToast("Both requirement and URL are required.", "warning"); return; }
@@ -65,6 +65,7 @@ export default function CombinedTab() {
     try {
       const data = await generateCombined(requirement, url, depth);
       setOutput(data);
+      setCombinedOutput(data);
       if (data.usageCount) setUsageCount(data.usageCount);
       if (data.mock) addToast("Showing demo data.", "warning");
       else addToast("Combined analysis complete!", "success");

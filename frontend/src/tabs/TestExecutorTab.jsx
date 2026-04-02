@@ -71,7 +71,18 @@ export default function TestExecutorTab() {
   const [saving, setSaving] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const pollRef = useRef(null);
-  const { addToast } = useStore();
+  const { addToast, combinedOutput } = useStore(state => ({ 
+    addToast: state.addToast, 
+    combinedOutput: state.combinedOutput 
+  }));
+
+  // Auto-import generated test cases infinitely with no loss of data
+  useEffect(() => {
+    if (combinedOutput?.test_cases?.length > 0) {
+      // Create executable array without losing steps
+      setTestCases(combinedOutput.test_cases);
+    }
+  }, [combinedOutput]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 

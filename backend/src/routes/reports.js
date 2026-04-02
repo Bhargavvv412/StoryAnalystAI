@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { verifyToken } = require("../middleware/authMiddleware");
 const { db } = require("../utils/firebaseAdmin");
+const axios = require("axios");
+
+const PYTHON_AI_URL = process.env.PYTHON_AI_URL || "http://localhost:10000";
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "dev_secret_change_me";
 
 // ─── POST /api/reports/save ───────────────────────────────────────────────────
 router.post("/save", verifyToken, async (req, res) => {
@@ -84,6 +88,37 @@ router.delete("/:id", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("[reports/delete]", err.message);
     res.status(500).json({ error: "Failed to delete report: " + err.message });
+  }
+});
+
+// ─── POST /api/reports/generate-html ─────────────────────────────────────────
+router.post("/generate-html", verifyToken, async (req, res) => {
+  const { results, summary } = req.body;
+  try {
+    const { data } = await axios.post(
+      `${PYTHON_AI_URL}/report`,
+      { results, summary },
+      { headers: { "X-Internal-Secret": INTERNAL_SECRET } }
+    );
+    res.send(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to generate HTML report from Python." });
+  }
+});
+
+// ─── GET /api/reports/download-html ──────────────────────────────────────────
+router.get("/download-html", async (req, res) => {
+  try {
+    const response = await axios({
+      method: "get",
+      url: `${PYTHON_AI_URL}/report/download`,
+      responseType: "stream"
+    });
+    res.setHeader("Content-Disposition", "attachment; filename=storyanalyst_test_report.html");
+    res.setHeader("Content-Type", "text/html");
+    response.data.pipe(res);
+  } catch (err) {
+    res.status(404).send("Report not available on Python backend.");
   }
 });
 
