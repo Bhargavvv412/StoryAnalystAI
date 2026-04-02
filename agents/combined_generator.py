@@ -75,6 +75,9 @@ class CombinedGeneratorAgent:
         user_role = story_data.get("user_role", "user")
         conditions = story_data.get("conditions", [])
         pages      = page_data.get("pages", [])
+        # IMPORTANT: We always navigate to the ROOT URL only.
+        # Sub-pages are used only for form/field matching, never as navigation targets.
+        start_url  = page_data.get("start_url", "") or (pages[0].get("url", "") if pages else "")
 
         test_cases = []
         for idx, condition in enumerate(conditions, 1):
@@ -86,18 +89,17 @@ class CombinedGeneratorAgent:
             tc_type, priority = self._classify(condition)
 
             if page is None:
-                # Unmapped — generate generic steps
                 tc = self._build_unmapped(tc_id, feature, user_role, condition,
-                                          tc_type, priority, page_data.get("start_url",""))
+                                          tc_type, priority, start_url)
             else:
                 tc = self._build_mapped(tc_id, feature, user_role, condition,
-                                        tc_type, priority, page, form)
+                                        tc_type, priority, page, form, start_url)
             test_cases.append(tc.to_dict())
 
         # Generate exhaustive combinatorial test cases for each matched form
         for page in pages:
             for form in page.get("forms", []):
-                tcs = self._generate_exhaustive_for_form(feature, user_role, page, form, len(test_cases) + 1)
+                tcs = self._generate_exhaustive_for_form(feature, user_role, page, form, len(test_cases) + 1, start_url)
                 for tc in tcs:
                     if len(test_cases) >= 1000:
                         break
@@ -109,7 +111,7 @@ class CombinedGeneratorAgent:
 
         return test_cases
 
-    def _generate_exhaustive_for_form(self, feature, user_role, page, form, start_idx):
+    def _generate_exhaustive_for_form(self, feature, user_role, page, form, start_idx, start_url=""):
         tcs = []
         idx = start_idx
         form_name = form.get("name", "form")
@@ -139,13 +141,13 @@ class CombinedGeneratorAgent:
                 
                 tc = self._build_mapped(
                     f"TC-{idx:03d}", feature, user_role, mock_cond,
-                    tc_type, priority, page, form
+                    tc_type, priority, page, form, start_url
                 )
                 
                 tc.condition = f"[Exhaustive - {form_name}] Field '{fname}': {var_name}"
                 tcs.append(tc.to_dict())
                 idx += 1
-                if len(tcs) > 1000:  # arbitrary safe cap per form
+                if len(tcs) > 1000:
                     return tcs
                     
         # Add form-wide extreme variations
@@ -159,7 +161,7 @@ class CombinedGeneratorAgent:
             mock_cond = f"{action_hint} → System handles the edge case safely"
             tc = self._build_mapped(
                 f"TC-{idx:03d}", feature, user_role, mock_cond,
-                tc_type, priority, page, form
+                tc_type, priority, page, form, start_url
             )
             tc.condition = f"[Exhaustive - {form_name}] Form-Wide: {var_name}"
             tcs.append(tc.to_dict())
@@ -235,21 +237,24 @@ class CombinedGeneratorAgent:
 
     # ── Build a mapped test case ───────────────────────────────────────────
     def _build_mapped(self, tc_id, feature, user_role, condition,
-                      tc_type, priority, page, form) -> CombinedTestCase:
-        url        = page.get("url", "")
+                      tc_type, priority, page, form, start_url="") -> CombinedTestCase:
+        # Use the ACTUAL page where the form/content was found.
+        # The executor will navigate directly there. If it's a sub-page of start_url
+        # it will be reachable. Falling back to start_url only if page URL is empty.
+        page_url   = page.get("url", "") or start_url
         page_title = page.get("title", "Page")
         form_name  = form.get("name", "form") if form else "—"
         fields     = form.get("fields", []) if form else []
         buttons    = form.get("buttons", []) if form else []
 
-        # Figure out what values to enter for each field
         manual_steps, auto_steps = self._generate_steps(
-            condition, url, page_title, form_name, fields, buttons, tc_type
+            condition, page_url, page_title, form_name, fields, buttons, tc_type,
+            start_url=start_url
         )
 
         return CombinedTestCase(
             tc_id=tc_id, feature=feature, user_role=user_role,
-            condition=condition, page_url=url, page_title=page_title,
+            condition=condition, page_url=page_url, page_title=page_title,
             form_name=form_name, type=tc_type, priority=priority,
             manual_steps=manual_steps, automation_steps=auto_steps,
             mapped=True,
@@ -283,23 +288,45 @@ class CombinedGeneratorAgent:
         )
 
     # ── Step generation ────────────────────────────────────────────────────
-    def _generate_steps(self, condition, url, page_title, form_name, fields, buttons, tc_type):
-        cl = condition.lower()
-        parts = condition.split("→")
+    def _generate_steps(self, condition, url, page_title, form_name, fields, buttons,
+                        tc_type, start_url=""):
+        parts        = condition.split("→")
         action_hint  = parts[0].strip().lower()
         outcome_hint = parts[1].strip() if len(parts) > 1 else ""
 
-        manual = [f"Open the browser and navigate to {url}."]
-        auto   = [f"Open browser and navigate to '{url}'."]
+        # ── Smart navigation ────────────────────────────────────────────────────
+        # If the target page is a sub-page, navigate through the home page first
+        # This handles cases like: home page → click 'Sign Up' link → signup form
+        is_subpage = start_url and url and url != start_url and url.startswith(start_url.rstrip("/"))
 
+        if is_subpage:
+            # Generate nav-link keyword from page title / URL path
+            nav_hint = self._nav_hint_from_url(url, page_title)
+            manual = [
+                f"Open the browser and navigate to {start_url}.",
+                f"On the home page, look for a '{nav_hint}' link or button in the navigation and click it.",
+                f"Confirm you are now on the '{page_title}' page ({url}).",
+            ]
+            auto = [
+                f"Open browser and navigate to '{start_url}'.",
+                f"Find link or button with text '{nav_hint}' and click().",
+                f"Open browser and navigate to '{url}'."  # fallback direct nav
+            ]
+        else:
+            manual = [f"Open the browser and navigate to {url}."]
+            auto   = [f"Open browser and navigate to '{url}'."]
+
+        # ── Form field steps ─────────────────────────────────────────────────────
         if fields:
             for fld in fields:
-                fname  = fld.get("name", fld.get("type", "field"))
-                ftype  = fld.get("type", "text")
-                value  = self._pick_value(fname, ftype, action_hint, tc_type)
-                manual.append(f"In the '{form_name}' form, locate the '{fname}' field ({ftype}) and enter: {value if value else '(leave empty)' }.")
+                fname = fld.get("name", fld.get("type", "field"))
+                ftype = fld.get("type", "text")
+                value = self._pick_value(fname, ftype, action_hint, tc_type)
+                manual.append(
+                    f"In the '{form_name}' form, locate the '{fname}' field ({ftype}) "
+                    f"and enter: {value if value != '' else '(leave empty)'}."
+                )
                 if value == "":
-                    # Negative test: clear/leave the field empty
                     auto.append(f"Clear the '{fname}' field.")
                 else:
                     auto.append(f"Enter '{value}' in the '{fname}' field.")
@@ -307,17 +334,32 @@ class CombinedGeneratorAgent:
             manual.append(f"Locate the relevant input area on '{page_title}'.")
             auto.append(f"# No form fields extracted — locate inputs manually on {url}.")
 
-        # Click button
+        # ── Submit + assertion ──────────────────────────────────────────────────
         btn_text = buttons[0]["text"] if buttons else "Submit"
         manual.append(f"Click the '{btn_text}' button.")
         auto.append(f"Find button with text '{btn_text}' and click().")
 
-        # Expected result assertion
         expected = outcome_hint or self._default_expected(tc_type, condition)
         manual.append(f"Verify that: {expected}.")
         auto.append(f"Assert that the page/response reflects: '{expected}'.")
 
         return manual, auto
+
+    def _nav_hint_from_url(self, url: str, page_title: str) -> str:
+        """Derive a natural navigation link text from the page URL or title."""
+        # Prefer page title words (e.g. 'Sign Up', 'Register', 'Login')
+        if page_title and page_title.lower() not in ("page", "unknown", ""):
+            return page_title
+        # Fallback: last segment of the URL path
+        try:
+            from urllib.parse import urlparse
+            path = urlparse(url).path.rstrip("/")
+            segment = path.split("/")[-1].replace("-", " ").replace("_", " ").title()
+            if segment:
+                return segment
+        except Exception:
+            pass
+        return "Sign Up"
 
     def _pick_value(self, fname: str, ftype: str, action_hint: str, tc_type: str) -> str:
         """Choose a realistic test value for a field based on condition context.

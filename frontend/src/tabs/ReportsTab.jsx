@@ -21,15 +21,22 @@ export default function ReportsTab() {
     setLoading(true);
     try {
       const data = await listReports();
-      setReports(data.reports || []);
+      setReports(Array.isArray(data?.reports) ? data.reports : []);
     } catch (err) {
       addToast("Failed to load reports: " + err.message, "error");
+      setReports([]);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { fetchReports(); }, []);
+  // Fetch on mount and whenever the tab regains focus
+  useEffect(() => {
+    fetchReports();
+    const onFocus = () => fetchReports();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   async function handleDelete(id) {
     try {
@@ -203,11 +210,21 @@ export default function ReportsTab() {
               <h3 className="font-semibold text-white mb-3">Report Detail</h3>
               <div className="space-y-2 text-sm mb-4">
                 <div className="flex justify-between"><span className="text-white/40">Type</span><span className="text-white">{TYPE_LABELS[selected.type] || selected.type}</span></div>
-                <div className="flex justify-between"><span className="text-white/40">Date</span><span className="text-white">{selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : "—"}</span></div>
-                <div className="flex justify-between"><span className="text-white/40">Results</span><span className="text-white">{Array.isArray(selected.results) ? selected.results.length : "—"}</span></div>
-                {selected.summary && Object.entries(selected.summary).map(([k, v]) => (
-                  <div key={k} className="flex justify-between"><span className="text-white/40 capitalize">{k}</span><span className="text-white">{typeof v === "object" ? JSON.stringify(v) : v}</span></div>
-                ))}
+                <div className="flex justify-between"><span className="text-white/40">Date</span><span className="text-white">{selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "—"}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Total Results</span><span className="text-white">{Array.isArray(selected.results) ? selected.results.length : "—"}</span></div>
+                {/* Pass / Fail breakdown */}
+                {Array.isArray(selected.results) && (() => {
+                  const p = selected.results.filter(r => r.status === "Pass").length;
+                  const f = selected.results.filter(r => r.status === "Fail" || r.status === "Error").length;
+                  const rate = selected.results.length > 0 ? Math.round(p / selected.results.length * 100) : 0;
+                  return (
+                    <>
+                      <div className="flex justify-between"><span className="text-white/40">Passed</span><span className="text-emerald-400 font-semibold">{p}</span></div>
+                      <div className="flex justify-between"><span className="text-white/40">Failed / Errors</span><span className="text-red-400 font-semibold">{f}</span></div>
+                      <div className="flex justify-between"><span className="text-white/40">Pass Rate</span><span className={`font-semibold ${rate >= 80 ? "text-emerald-400" : rate >= 50 ? "text-amber-400" : "text-red-400"}`}>{rate}%</span></div>
+                    </>
+                  );
+                })()}
               </div>
               <div className="flex flex-col gap-2">
                 <Button variant="primary" size="sm" onClick={() => exportHTML(selected)} icon={Download}>Export HTML (Python API)</Button>

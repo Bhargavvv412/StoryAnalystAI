@@ -7,43 +7,91 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import { CardSkeleton } from "../components/LoadingSkeleton";
 
+const TYPE_META = {
+  Positive:   { color: "text-emerald-400 bg-emerald-500/10", label: "Valid inputs → expected success" },
+  Negative:   { color: "text-red-400   bg-red-500/10",     label: "Invalid inputs → error shown" },
+  Boundary:   { color: "text-amber-400 bg-amber-500/10",   label: "Min/max limits exactly" },
+  "Edge Case": { color: "text-purple-400 bg-purple-500/10",  label: "Unusual/extreme scenarios" },
+};
+
 function TestCaseRow({ tc, index }) {
   const [expanded, setExpanded] = useState(false);
-  const typeColors = { Positive: "text-emerald-400 bg-emerald-500/10", Negative: "text-red-400 bg-red-500/10", Boundary: "text-amber-400 bg-amber-500/10", "Edge Case": "text-purple-400 bg-purple-500/10" };
-  
+  const meta = TYPE_META[tc.type] || TYPE_META.Positive;
+
+  // Python returns: tc_id, condition, type, priority, manual_steps, automation_steps
+  const displayId    = tc.tc_id  || tc.id    || `#${index + 1}`;
+  const displayTitle = tc.condition || tc.title || "(no description)";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: Math.min(index * 0.03, 0.5) }}
       className="glass rounded-xl overflow-hidden"
     >
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
       >
-        <span className="text-xs font-mono text-white/30 w-14 flex-shrink-0">{tc.id}</span>
-        <span className="font-medium text-white text-sm flex-1 truncate">{tc.title}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${typeColors[tc.type] || typeColors.Positive}`}>{tc.type}</span>
+        <span className="text-xs font-mono text-white/30 w-16 flex-shrink-0">{displayId}</span>
+        <span className="font-medium text-white text-sm flex-1 truncate" title={displayTitle}>{displayTitle}</span>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${meta.color}`}>{tc.type}</span>
         <span className="text-white/30 flex-shrink-0">{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
       </button>
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t border-surface-border">
-          <div className="space-y-1.5 mt-3">
-            {tc.steps?.map((step) => (
-              <div key={step.step} className="flex items-start gap-2 text-xs">
-                <span className="w-5 h-5 rounded-full bg-brand-blue/20 text-blue-300 flex items-center justify-center font-bold flex-shrink-0">{step.step}</span>
-                <div>
-                  <span className="text-white/70">{step.action}</span>
-                  {step.selector && <span className="text-white/30 ml-2 font-mono">{step.selector}</span>}
+          {/* Type legend */}
+          <p className="text-xs text-white/40 mt-3 italic">🏷 {tc.type}: {meta.label}</p>
+
+          {/* Priority + page */}
+          <div className="flex gap-4 text-xs text-white/40">
+            {tc.priority && <span>Priority: <span className="text-white/70">{tc.priority}</span></span>}
+            {tc.page_title && <span>Page: <span className="text-white/70">{tc.page_title}</span></span>}
+            {tc.form_name && tc.form_name !== "—" && <span>Form: <span className="text-white/70">{tc.form_name}</span></span>}
+          </div>
+
+          {/* Manual Steps */}
+          {tc.manual_steps?.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-white/50">Manual Steps:</p>
+              {tc.manual_steps.map((step, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-brand-blue/20 text-blue-300 flex items-center justify-center font-bold flex-shrink-0 mt-0.5">{i + 1}</span>
+                  <span className="text-white/70">{step}</span>
                 </div>
+              ))}
+            </div>
+          )}
+
+          {/* Automation Steps */}
+          {tc.automation_steps?.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-white/50">Automation Steps:</p>
+              <div className="bg-black/20 rounded-lg p-2 font-mono text-xs text-white/50 space-y-0.5">
+                {tc.automation_steps.map((step, i) => (
+                  <p key={i}>{i + 1}. {step}</p>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex items-start gap-2 text-xs">
-            <CheckCircle size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-            <span className="text-white/60">{tc.expectedResult}</span>
-          </div>
+            </div>
+          )}
+
+          {/* Old-style steps fallback */}
+          {!tc.manual_steps && tc.steps?.map((step) => (
+            <div key={step.step} className="flex items-start gap-2 text-xs">
+              <span className="w-5 h-5 rounded-full bg-brand-blue/20 text-blue-300 flex items-center justify-center font-bold flex-shrink-0">{step.step}</span>
+              <div>
+                <span className="text-white/70">{step.action}</span>
+                {step.selector && <span className="text-white/30 ml-2 font-mono">{step.selector}</span>}
+              </div>
+            </div>
+          ))}
+
+          {tc.expectedResult && (
+            <div className="flex items-start gap-2 text-xs">
+              <CheckCircle size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+              <span className="text-white/60">{tc.expectedResult}</span>
+            </div>
+          )}
         </div>
       )}
     </motion.div>
@@ -140,18 +188,31 @@ export default function CombinedTab() {
 
       {output && !loading && (
         <>
-          {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: "Total", value: summary?.total || 0, color: "text-white" },
-              { label: "Positive", value: summary?.by_type?.Positive || 0, color: "text-emerald-400" },
-              { label: "Negative", value: summary?.by_type?.Negative || 0, color: "text-red-400" },
-              { label: "Mapped", value: summary?.mapped || 0, color: "text-blue-400" },
+              { label: "Total",      value: summary?.total || 0,              color: "text-white" },
+              { label: "Positive",   value: summary?.by_type?.Positive   || 0, color: "text-emerald-400", hint: "Valid input flows" },
+              { label: "Negative",   value: summary?.by_type?.Negative   || 0, color: "text-red-400",     hint: "Error/rejection flows" },
+              { label: "Boundary",   value: summary?.by_type?.Boundary   || 0, color: "text-amber-400",   hint: "Min/max edge" },
+              { label: "Edge Case",  value: summary?.by_type?.["Edge Case"] || 0, color: "text-purple-400", hint: "Unusual scenarios" },
+              { label: "Mapped",     value: summary?.mapped || 0,              color: "text-blue-400",    hint: "Linked to real page" },
             ].map((s) => (
               <Card key={s.label} hover={false}>
                 <p className={`font-display font-bold text-2xl ${s.color}`}>{s.value}</p>
                 <p className="text-white/40 text-xs">{s.label}</p>
+                {s.hint && <p className="text-white/20 text-[10px] leading-tight mt-0.5">{s.hint}</p>}
               </Card>
+            ))}
+          </div>
+
+          {/* Type legend */}
+          <div className="flex flex-wrap gap-3 text-xs">
+            {Object.entries(TYPE_META).map(([type, m]) => (
+              <span key={type} className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${m.color}`}>
+                <span className="font-semibold">{type}</span>
+                <span className="text-white/40">— {m.label}</span>
+              </span>
             ))}
           </div>
 

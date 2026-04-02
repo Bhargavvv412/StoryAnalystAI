@@ -601,12 +601,23 @@ function _enableReportBtn() {
 
 // Ctrl+Enter shortcuts
 
-document.getElementById("story-input").addEventListener("keydown", e => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) analyze();
-});
-document.getElementById("url-input").addEventListener("keydown", e => {
-  if (e.key === "Enter") exploreUrl();
-});
-document.getElementById("combo-url").addEventListener("keydown", e => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generateCombined();
-});
+const storyInput = document.getElementById("story-input");
+if (storyInput) {
+  storyInput.addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) analyze();
+  });
+}
+
+const urlInput = document.getElementById("url-input");
+if (urlInput) {
+  urlInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") exploreUrl();
+  });
+}
+
+const comboUrl = document.getElementById("combo-url");
+if (comboUrl) {
+  comboUrl.addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generateCombined();
+  });
+}

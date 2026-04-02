@@ -13,29 +13,7 @@ function generateJobId() {
   return `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Mock execution result for one test case */
-function mockExecuteTestCase(tc) {
-  const passed = Math.random() > 0.25; // 75% pass rate
-  const execTime = (Math.random() * 2 + 0.3).toFixed(2);
-  const screenshots = [
-    "https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800",
-    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800",
-    "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800",
-  ];
-
-  return {
-    id: tc.id || `TC-${Date.now()}`,
-    title: tc.title || "Unnamed Test",
-    status: passed ? "Pass" : "Fail",
-    execTime: parseFloat(execTime),
-    timestamp: new Date().toISOString(),
-    screenshot: screenshots[Math.floor(Math.random() * screenshots.length)],
-    logs: passed
-      ? [`✅ Step 1: Navigation successful`, `✅ Step 2: Element found`, `✅ Step 3: Assertion passed`]
-      : [`✅ Step 1: Navigation successful`, `❌ Step 2: Element not found — selector: ${tc.steps?.[1]?.selector || ".target"}`, `❌ Test failed: assertion mismatch`],
-    error: passed ? null : "Element not found or assertion failed",
-  };
-}
+// Removed mockExecuteTestCase functionality to enforce accurate Python execution
 
 // ─── POST /api/tests/execute ─────────────────────────────────────────────────
 // Synchronous execution (try Python, fallback to mock)
@@ -53,25 +31,17 @@ router.post("/execute", verifyToken, async (req, res) => {
       { headers: { "X-Internal-Secret": INTERNAL_SECRET }, timeout: 180000 }
     );
     return res.json({ ...data, mock: false });
-  } catch {
-    // Mock execution
-    const results = test_cases.map(mockExecuteTestCase);
-    const passed = results.filter((r) => r.status === "Pass").length;
-    const failed = results.filter((r) => r.status === "Fail").length;
-
-    return res.json({
-      results,
-      summary: { total: results.length, passed, failed, errored: 0 },
-      mock: true,
-      mockNote: "Simulated test execution — Python executor unavailable.",
-    });
+  } catch (err) {
+    console.error("Python executor failed:", err.message);
+    const errMsg = err.response?.data?.error || err.message;
+    return res.status(500).json({ error: "Failed to execute tests on Python microservice. " + errMsg });
   }
 });
 
 // ─── POST /api/tests/start ───────────────────────────────────────────────────
 // Async job-based execution with polling
 router.post("/start", verifyToken, async (req, res) => {
-  const { test_cases = [] } = req.body;
+  const { test_cases = [], workers = 1 } = req.body;
   if (!test_cases.length) {
     return res.status(400).json({ error: "No test cases provided." });
   }
@@ -87,15 +57,16 @@ router.post("/start", verifyToken, async (req, res) => {
       
       const { data } = await axios.post(
         `${PYTHON_AI_URL}/execute`,
-        { test_cases, headless: true },
-        { headers: { "X-Internal-Secret": INTERNAL_SECRET }, timeout: 180000 }
+        { test_cases, headless: true, workers: Math.max(1, Math.min(Number(workers), 8)) },
+        { headers: { "X-Internal-Secret": INTERNAL_SECRET }, timeout: 600000 }  // 10 min max
       );
       
-      // Mutate screenshot paths to pipe through node.js proxy instead of direct 10000 port
+      // Fix screenshot paths: Python returns "screenshots/filename.png" (no leading slash)
       const results = (data.results || []).map(r => {
-        if (r.screenshot && r.screenshot.startsWith("/screenshots/")) {
-          // Node route will be /api/tests/screenshots/file.png
-          r.screenshot = `/api/tests${r.screenshot}`; 
+        if (r.screenshot_path) {
+          // Normalise to just the filename part
+          const fname = r.screenshot_path.replace(/^\/?screenshots\//, '');
+          r.screenshot = `/api/tests/screenshots/${fname}`;
         }
         return r;
       });
@@ -108,15 +79,15 @@ router.post("/start", verifyToken, async (req, res) => {
         summary: data.summary || { total: results.length, passed: results.filter(r=>r.status==="Pass").length, failed: results.filter(r=>r.status==="Fail").length, errored: 0 }
       });
     } catch (err) {
-      console.warn("⚠️ Python executor failed, falling back to mock:", err.message);
-      const results = test_cases.map(mockExecuteTestCase);
+      console.warn("⚠️ Python executor failed:", err.message);
+      const errMsg = err.response?.data?.error || err.message;
       jobs.set(jobId, {
-        status: "done",
-        progress: test_cases.length,
+        status: "failed",
+        error: errMsg,
+        progress: 0,
         total: test_cases.length,
-        results,
-        summary: { total: results.length, passed: results.filter((r) => r.status === "Pass").length, failed: results.filter((r) => r.status === "Fail").length, errored: 0 },
-        mockNote: "Python executor failed, showing mock data."
+        results: [],
+        summary: { total: test_cases.length, passed: 0, failed: test_cases.length, errored: test_cases.length },
       });
     }
   })();

@@ -63,8 +63,8 @@ export const generateCombined = (requirement, url, depth = 1) =>
 export const executeTests = (testCases, headless = true) =>
   api.post("/api/tests/execute", { test_cases: testCases, headless }).then((r) => r.data);
 
-export const startTestJob = (testCases) =>
-  api.post("/api/tests/start", { test_cases: testCases }).then((r) => r.data);
+export const startTestJob = (testCases, workers = 1) =>
+  api.post("/api/tests/start", { test_cases: testCases, workers }).then((r) => r.data);
 
 export const pollTestJob = (jobId) =>
   api.get(`/api/tests/status/${jobId}`).then((r) => r.data);

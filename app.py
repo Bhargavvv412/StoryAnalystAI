@@ -133,11 +133,12 @@ def execute():
     data       = request.get_json() or {}
     test_cases = data.get("test_cases", [])
     headless   = data.get("headless", True)
+    workers    = max(1, min(int(data.get("workers", 1)), 8))  # 1–8 parallel Chrome instances
 
     if not test_cases:
         return jsonify({"error": "No test cases provided."}), 400
     try:
-        results = executor.execute_all(test_cases, headless=headless)
+        results = executor.execute_all(test_cases, headless=headless, workers=workers)
         passed  = sum(1 for r in results if r["status"] == "Pass")
         failed  = sum(1 for r in results if r["status"] == "Fail")
         errored = sum(1 for r in results if r["status"] == "Error")

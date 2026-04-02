@@ -41,6 +41,8 @@ const useStore = create(
       explorerOutput: null,
       combinedOutput: null,
       testResults: null,
+      generatedTests: [],
+      executedResults: [],
       generationLoading: false,
       generationError: null,
       activeReports: [],
@@ -173,9 +175,14 @@ const useStore = create(
       setExplorerOutput: (data) => set({ explorerOutput: data }),
       setCombinedOutput: (data) => set({ combinedOutput: data }),
       setTestResults: (data) => set({ testResults: data }),
+      setGeneratedTests: (tests) => set({ generatedTests: tests }),
+      setExecutedResults: (results) => set({ executedResults: results }),
       setGenerationLoading: (v) => set({ generationLoading: v }),
       setGenerationError: (e) => set({ generationError: e }),
-      clearGenerationState: () => set({ storyOutput: null, explorerOutput: null, combinedOutput: null, testResults: null, generationError: null }),
+      clearGenerationState: () => set({ 
+        storyOutput: null, explorerOutput: null, combinedOutput: null, 
+        testResults: null, generatedTests: [], executedResults: [], generationError: null 
+      }),
 
       addReport: (report) => set((s) => ({ activeReports: [report, ...s.activeReports].slice(0, 50) })),
       setReports: (reports) => set({ activeReports: reports }),
